@@ -1,0 +1,50 @@
+---
+title: "Stroke Prediction -Machine Learning"
+author: "Mulei Mutuku"
+date: "2024-02-13"
+output: pdf_document
+---
+
+# Stroke Prediction
+
+# Introduction
+
+
+## Main Objective
+
+
+## Specific Objectives
+
+
+## Metric Of Success
+
+
+# Data Understanding
+
+
+# Data Preparation
+
+
+# Eploratory Data Analysis
+
+
+# Data Preprocessing
+
+
+# Modelling
+
+
+# Conclusion
+
+
+# Recommendations
+
+
+
+
+
+
+
+
+
+
