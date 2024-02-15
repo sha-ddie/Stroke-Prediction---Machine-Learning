@@ -20,24 +20,423 @@ output: pdf_document
 
 
 # Data Understanding
+The data used contains 12 features and 5,110 rows/ observations. The data entails, 12 stroke related factors collected from 5,110 individuals, in order to evaluate the relationships between experiencing a stroke and other features, identifying factors that could influence stroke risk. The feature include; 
+- **id**: unique identifier
+- **gender**: "Male", "Female" or "Other"
+- **age**: age of the patient
+- **hypertension**: 0 if the patient doesn't have hypertension, 1 if the patient has hypertension
+- **heart_disease**: 0 if the patient doesn't have any heart diseases, 1 if the patient has a heart disease.
+- **ever_married**: "No" or "Yes".
+- **work_type**: "children", "Govt_jov", "Never_worked", "Private" or "Self-employed".
+- **Residence_type**: "Rural" or "Urban".
+- **avg_glucose_level**: average glucose level in blood (Normally should be 70-140 mg/dl).
+- **bmi**: body mass index (Normally should be 18-25),
+- **smoking_status**: "formerly smoked", "never smoked", "smokes" or "Unknown".
+- **stroke**: 1 if the patient had a stroke or 0 if not.
 
+Loading all the required libraries, used in analysis.
+```{r}
+library(dplyr)
+library(ggplot2)
+library(rsample)
+library(yardstick)
+library(stringr)
+```
+
+Importing the dataset, and previewing it.
+```{r}
+# loading data set into df variable
+df = read.csv("./data/healthcare-dataset-stroke-data.csv")
+
+
+# previewing data set
+paste0("Rows: ",dim(df)[1]," Columns: ", dim(df)[2])
+head(df)
+```
+
+```{r}
+# viewing data
+skimr::skim(df)
+
+# summary statistics
+summary(df)
+```
+The data set has 12 columns with 6 being of `character` type and 6 `numeric`.
+
+Based on the summary statistic, the following observations are made;
+1. The `age` and `avg_glucose_level` have outliers or they have skewed distributions.
+2. The `age` column has a minimum age of 0 which is not possible.
+3. The `bmi` column has character type and should be `numeric`.
 
 # Data Preparation
+In this section, we will perform data cleaning to prepare the dataset for analysis, the various data cleaning methods that are to be used will be;
+- Data type conversion
+- Checking for Missing values
+- Checking and removing duplicates
+- Removing Unnecessary columns
+- Checking for Missing values Placeholder
+
+From the summary statistics, we saw ages of zero, we then assign 1 where age is less than 1.
+```{r}
+# changing the minimun value of age colum
+df$age[df$age<1] = 1
+```
+
+```{r}
+# Data type conversion for bmi column into numeric
+class(df$bmi)
+
+df$bmi = as.numeric(df$bmi)
+```
+
+```{r}
+# checking for missing values or NAs
+sapply(names(df), function(x){sum(is.na(df[[x]]))})
+paste0("NAs: ",sum(is.na(df)))
+
+# distribution of bmi column
+summary(df$bmi)
+```
+From the summary statistics of the `bmi` column, the mean and median are approximately equal, implying a normal distribution. Therefore we will perform **mean** imputation to del with Nas in `bmi` column.
+```{r}
+# Dealing with Nas in bmi column
+df$bmi[ is.na(df$bmi)] = mean(df$bmi, na.rm = TRUE)
+```
+
+```{r}
+# checking for duplicates
+sum(duplicated(df))
+```
+Since the `id` column has no influence in our analysis, we remove it from out data. 
+```{r}
+#removing id column
+df = df[-1]
+```
+
+We will, identify the unique values of the categorical columns to investigate wether there are missing values represented by place holders. 
+```{r}
+# extracting only the categorical columns
+cat_cols = df %>% select(where(is.character)) %>% colnames()
+
+#checking the unique values in categorical variables for place holders
+sapply(cat_cols, function(x){
+                    y=df[[x]]
+                    paste( unique(y))
+        })
+```
+There are no placeholders in any of the columns, but the "Other" category in gender should imputed
+```{r}
+# removing the "Other" category in gender
+table(df$gender)
+
+# since the mode of the gender  column is female we assign `other` as female
+df$gender[df$gender=="Other"] = "Female"
+
+```
+
 
 
 # Eploratory Data Analysis
+Examining the patterns and trends in the individual attributes through visualizations.
+First, we will convert all the binary columns into factors for better visualizations 
+```{r}
+dff = df %>% 
+        mutate( hypertension = ifelse(hypertension==1,"Yes","No"),
+                heart_disease = ifelse(heart_disease==1,"Yes","No"),
+                stroke= ifelse(stroke==1,"Yes","No"))
+```
 
+
+Plotting the value counts of the character values of their unique values
+```{r}
+# using sapply function to plot their distribution
+cat_ = dff %>% select(where(is.character)) %>% colnames()
+
+sapply(cat_, function(x){
+  y= dff[[x]]
+  plot =ggplot(data=dff, aes(x=y))+
+    geom_bar(fill= "#436850")+
+    geom_label( aes(label= after_stat(count)),
+               stat="count")+
+    labs(title=paste0("BarPlot of ",str_to_title(x)," Column"),
+         y= "Counts",
+         x= paste0(x))
+  print(plot)
+})
+```
+
+From the plots above, the following observations are made;
+1.
+2.
+
+
+Plotting the relationships between our dependent variable ,`stroke`, and the character columns.
+```{r}
+#
+sapply(cat_, function(x){
+  y= dff[[x]]
+  plot = ggplot(data=dff, aes(x= stroke, fill= y ))+
+            geom_bar( position="dodge")+
+            geom_label( 
+              aes(label= paste0(round((after_stat(count)/5110)*100,0),"%")),
+                  stat="count",
+                  position = position_dodge(1), 
+                  hjust=0.5,
+                  vjust=-0.05)+
+           labs(
+                title=paste0(" Distribution of ",str_to_title(x),
+                             " vs Stroke Column"),
+                 y= "Counts",
+                 x= "Stroke",
+                fill =paste0(x))
+        
+  print(plot)
+})
+```
+
+From the plots above, the following observations are made;
+1.
+2.
+
+
+
+Plotting the distributions of numeric variables
+```{r}
+# extracting the numeric column
+num_cols = dff %>% select(where(is.numeric)) %>% colnames()
+
+# plotting their distribution
+sapply(num_cols, function(x){
+  y= dff[[x]]
+  plot = ggplot(data=dff, aes(x=y))+
+            geom_histogram(fill="#436850",bins=20)+
+            labs(title=paste0("Histogram of ",str_to_title(x)," Column"),
+                 y= "Frequency",
+                 x= paste0(x))
+  
+  print(plot)
+})
+```
+
+From the plots above, the following observations are made;
+1.
+2.
+
+```{r}
+df$age[df$age<1]
+```
+
+
+Plotting the realationship beyween numeric columns and `stroke` column
+```{r}
+# relationship between numeric columns and stroke
+sapply(num_cols, function(x){
+  y= df[[x]]
+  plot = ggplot(data=df, aes(x=as.factor(stroke), y= y))+
+          geom_boxplot()+
+          labs(
+          title=paste0("Boxplot of ",str_to_title(x)," Against Stroke Column"),
+                 y= paste0(x),
+                 x=  "Stroke")
+  
+  print(plot)
+})
+```
+
+From the plots above, the following observations are made;
+1.
+2.
+
+
+
+# Statistical Inference
+In this section we perform hypothesis test to test whether there are relationship between our predictor variables with the response variable, `stroke`. This will be accomplished in two steps;
+
+i). **chi -square** test of independence between the categorical columns and the stroke i.e.tests the categorical columns are independent/ dependent of the response variable, `is there a relationship between the categorical columns and the Stroke column`.
+ Ho: The categorical columns and Stroke are independent
+ Ha: The categorical columns and Stroke are dependent
+```{r}
+
+chisq.test(table(dff$gender, dff$stroke))[3]
+
+sapply(cat_, function(x){
+                    t= table(df$stroke,df[[x]])
+                    list(chisq.test(t)$p.value )
+                    })
+```
+
+From the p-values above; the chances of getting a stroke are dependent on the following factors; `hypertension`, `heart_disease`, `ever_married`, `work_type`, and `smoking_status`.
+
+
+ii). 
+
+shapiro.test : ho:  vars is normally distributed
+               h1: vars is not normally distributed
+
+var.test : ho:  vars are equal
+           h1: vars are not equal
+
+t.test: ho: popln means are same.
+        h1: popln means are not same.
+
+wilcox.test: ho: The distributions of the two groups are identical
+        h1:The distributions of the two groups are different
+```{r}
+
+x = df[ df$stroke==1, "bmi"]
+y = df[ df$stroke==0, "bmi"]
+shapiro.test(df$bmi)
+ks.test(df$bmi, "pnorm", mean = mean(df$bmi), sd = sd(df$bmi))
+
+var.test(x,y)
+
+
+
+result <- t.test(age ~ stroke, data = dff,
+                 alternative="two.sided",
+                 var.equal=F )
+
+wilcox.test( bmi~ stroke, data = dff)
+```
+
+Correlations between Stroke and numeric columns
+```{r}
+library(corrr)
+df %>% correlate() %>%  focus(stroke)
+
+```
 
 # Data Preprocessing
 
+## Categorical encoding
+Before modelling we'll have to convert all the categorical columns into integers.
+```{r}
+# printing the uniqu values of the categorical columns
+sapply(cat_cols, function(x){
+                    y=df[[x]]
+                    paste( unique(y))
+        })
+```
+
+Since all the above categories are of Nominal type, no order or ranking, then we are performing **Dummy encoding**.
+```{r}
+library(fastDummies)
+data = dummy_cols(.data= df,
+                  remove_first_dummy = T,   # preventing dummy trap
+                  remove_selected_columns = T)  # removing original columns
+
+```
+
+
+## train test split
+We split the data into training(80%) and testing (20%) sets, in order to test model performances on unseen data.
+```{r}
+# setting seed for re productivity
+set.seed(123) 
+
+# train test split
+split_ = initial_split(data=data, prop = 0.8)
+train = training(split_)
+test = testing(split_)
+```
+
+
+## handling class imbalance
+Due to the class imbalance in our target variable, `stroke`, we will do a minority oversampling in order to get balanced classes, by generating synthetic data for the minority class using techniques like SMOTE (Synthetic Minority Over-sampling Technique).
+```{r}
+#showing class imbalance fo target variable
+prop.table(table(data$stroke))
+```
+
+Class 0 of stroke,No stroke, contains 95% of the observations while people who had stoke form 5%.
+```{r}
+#install.packages("remotes")
+#remotes::install_github("cran/DMwR")
+library(DMwR)
+
+data = SMOTE(form=stroke~., 
+             data=train,   # formula and data
+             perc.over = 200,  # percentage of over-sampling
+             perc.under = 100,
+             k = 3)          #number of neighbors to consider
+
+summary(train)
+dim(data)
+names(data)
+str(data)
+prop.table(table(train$stroke))
+```
+
+```{r}
+
+install.packages("ROSE")
+library(ROSE)
+
+oversampled_data <- ovun.sample(stroke ~., 
+                                data = train, 
+                                method = "over",
+                                N = 3000,
+                                seed = 123)
+
+```
 
 # Modelling
 
+```{r}
+m = glm(stroke~., data=train, family = binomial)
+predict(m)
+```
+
+```{r}
+probs = predict(m,newdata=test,type="response")
+y_pred = ifelse(probs>= 0.5, 1,0)
+table(y_pred)
+
+metrics2 = function(model, data, boundary=0.5){
+  y= data$stroke
+  
+  # making predictions
+  probs = predict(model,newdata=data, type="response")
+  y_pred = ifelse(probs>= boundary, 1,0)
+  # calculating metrics
+  dff= data.frame("truth"= as.factor(y),
+                  "estimate"= as.factor(y_pred))
+  acc= yardstick::accuracy(truth, estimate,data=dff)$.estimate
+  prec= yardstick::precision(truth, estimate,data=dff)$.estimate
+  rec= yardstick::recall(truth, estimate,data=dff)$.estimate
+  
+  cat("Accuracy:", acc,
+      "Precision: ", prec,
+      "Recall: ", rec)
+}
+
+cat("Training \n")
+cat(metrics2(m,train),"\n")
+cat("Testing \n")
+cat(metrics2(m, test))
+
+ta
+```
+
+
+```{r}
+table(test$stroke,y_pred) %>% metrics()
+
+confusionMatrix(table(test$stroke,y_pred)) %>% metrics()
+```
 
 # Conclusion
 
 
 # Recommendations
+
+
+
+
+
+
+
+
 
 
 
