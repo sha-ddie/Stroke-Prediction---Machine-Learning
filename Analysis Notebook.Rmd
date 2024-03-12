@@ -68,8 +68,8 @@ Based on the summary statistic, the following observations are made;
 2. The `age` column has a minimum age of 0 which is not possible.
 3. The `bmi` column has character type and should be `numeric`.
 
-# Data Preparation
-In this section, we will perform data cleaning to prepare the dataset for analysis, the various data cleaning methods that are to be used will be;
+# Data Preparation/ Cleaning
+In this section, we will perform data cleaning to prepare the data set for analysis, the various data cleaning methods that are to be used will be;
 - Data type conversion
 - Checking for Missing values
 - Checking and removing duplicates
@@ -78,7 +78,7 @@ In this section, we will perform data cleaning to prepare the dataset for analys
 
 From the summary statistics, we saw ages of zero, we then assign 1 where age is less than 1.
 ```{r}
-# changing the minimun value of age colum
+# changing the minimum value of age column
 df$age[df$age<1] = 1
 ```
 
@@ -97,9 +97,9 @@ paste0("NAs: ",sum(is.na(df)))
 # distribution of bmi column
 summary(df$bmi)
 ```
-From the summary statistics of the `bmi` column, the mean and median are approximately equal, implying a normal distribution. Therefore we will perform **mean** imputation to del with Nas in `bmi` column.
+From the summary statistics of the `bmi` column, the mean and median are approximately equal, implying a normal distribution. Therefore we will perform **mean** imputation to deal with Na's in `bmi` column.
 ```{r}
-# Dealing with Nas in bmi column
+# Dealing with Na's in bmi column
 df$bmi[ is.na(df$bmi)] = mean(df$bmi, na.rm = TRUE)
 ```
 
@@ -110,10 +110,11 @@ sum(duplicated(df))
 Since the `id` column has no influence in our analysis, we remove it from out data. 
 ```{r}
 #removing id column
-df = df[-1]
+#df = df[-1]
+df= df %>% select(-id)
 ```
 
-We will, identify the unique values of the categorical columns to investigate wether there are missing values represented by place holders. 
+We will, identify the unique values of the categorical columns to investigate whether there are missing values represented by place holders. 
 ```{r}
 # extracting only the categorical columns
 cat_cols = df %>% select(where(is.character)) %>% colnames()
@@ -124,7 +125,7 @@ sapply(cat_cols, function(x){
                     paste( unique(y))
         })
 ```
-There are no placeholders in any of the columns, but the "Other" category in gender should imputed
+There are no placeholders in any of the columns, but the "Other" category in gender should imputed or removed.
 ```{r}
 # removing the "Other" category in gender
 table(df$gender)
@@ -133,6 +134,20 @@ table(df$gender)
 df$gender[df$gender=="Other"] = "Female"
 
 ```
+since the `mode` of the `gender`  column is female we assign `other` as female so as not to influence the distribution of the gender column.
+
+From the `work_type` and `smoking_status` columns, we identify categories that have spaces and "-" between them, this will later be problematic during dummying and modeling. Therefore, we replace all the spaces and "-" between words with "_" symbol.
+
+```{r}
+# cleaning the text work_type and smoking_status columns 
+df = df %>%
+      mutate(work_type = str_replace_all(work_type, "[-| ]", "_"), 
+            smoking_status = str_replace_all(smoking_status, "[-| ]", "_") )
+
+# confirming
+df %>%
+  select(work_type, smoking_status) %>% unique()
+```
 
 
 
@@ -140,7 +155,7 @@ df$gender[df$gender=="Other"] = "Female"
 Examining the patterns and trends in the individual attributes through visualizations.
 First, we will convert all the binary columns into factors for better visualizations 
 ```{r}
-dff = df %>% 
+eda = df %>% 
         mutate( hypertension = ifelse(hypertension==1,"Yes","No"),
                 heart_disease = ifelse(heart_disease==1,"Yes","No"),
                 stroke= ifelse(stroke==1,"Yes","No"))
@@ -150,11 +165,11 @@ dff = df %>%
 Plotting the value counts of the character values of their unique values
 ```{r}
 # using sapply function to plot their distribution
-cat_ = dff %>% select(where(is.character)) %>% colnames()
+cat_ = eda %>% select(where(is.character)) %>% colnames()
 
 sapply(cat_, function(x){
-  y= dff[[x]]
-  plot =ggplot(data=dff, aes(x=y))+
+  y= eda[[x]]
+  plot =ggplot(data=eda, aes(x=y))+
     geom_bar(fill= "#436850")+
     geom_label( aes(label= after_stat(count)),
                stat="count")+
@@ -174,8 +189,8 @@ Plotting the relationships between our dependent variable ,`stroke`, and the cha
 ```{r}
 #
 sapply(cat_, function(x){
-  y= dff[[x]]
-  plot = ggplot(data=dff, aes(x= stroke, fill= y ))+
+  y= eda[[x]]
+  plot = ggplot(data=eda, aes(x= stroke, fill= y ))+
             geom_bar( position="dodge")+
             geom_label( 
               aes(label= paste0(round((after_stat(count)/5110)*100,0),"%")),
@@ -203,12 +218,12 @@ From the plots above, the following observations are made;
 Plotting the distributions of numeric variables
 ```{r}
 # extracting the numeric column
-num_cols = dff %>% select(where(is.numeric)) %>% colnames()
+num_cols = eda %>% select(where(is.numeric)) %>% colnames()
 
 # plotting their distribution
 sapply(num_cols, function(x){
-  y= dff[[x]]
-  plot = ggplot(data=dff, aes(x=y))+
+  y= eda[[x]]
+  plot = ggplot(data=eda, aes(x=y))+
             geom_histogram(fill="#436850",bins=20)+
             labs(title=paste0("Histogram of ",str_to_title(x)," Column"),
                  y= "Frequency",
@@ -222,17 +237,15 @@ From the plots above, the following observations are made;
 1.
 2.
 
-```{r}
-df$age[df$age<1]
-```
+
 
 
 Plotting the realationship beyween numeric columns and `stroke` column
 ```{r}
 # relationship between numeric columns and stroke
 sapply(num_cols, function(x){
-  y= df[[x]]
-  plot = ggplot(data=df, aes(x=as.factor(stroke), y= y))+
+  y= eda[[x]]
+  plot = ggplot(data=eda, aes(x=as.factor(stroke), y= y))+
           geom_boxplot()+
           labs(
           title=paste0("Boxplot of ",str_to_title(x)," Against Stroke Column"),
@@ -246,6 +259,37 @@ sapply(num_cols, function(x){
 From the plots above, the following observations are made;
 1.
 2.
+
+
+
+```{r}
+library(GGally)
+
+eda %>%
+  select(gender, age, bmi,stroke) %>% 
+  ggpairs(mapping = aes(color=stroke))
+```
+
+```{r}
+
+###
+#eda %>%
+#  select(work_type,smoking_status ,stroke) %>% 
+#  ggpairs(mapping = aes(color=stroke))
+
+```
+
+
+
+
+```{r}
+
+eda %>%
+  select(hypertension, heart_disease , avg_glucose_level,stroke) %>% 
+  ggpairs(mapping = aes(color=stroke))
+```
+
+
 
 
 
@@ -283,20 +327,18 @@ wilcox.test: ho: The distributions of the two groups are identical
         h1:The distributions of the two groups are different
 ```{r}
 
-x = df[ df$stroke==1, "bmi"]
-y = df[ df$stroke==0, "bmi"]
-shapiro.test(df$bmi)
-ks.test(df$bmi, "pnorm", mean = mean(df$bmi), sd = sd(df$bmi))
+#x = df[ df$stroke==1, "bmi"]
+#y = df[ df$stroke==0, "bmi"]
+#shapiro.test(df$bmi)
+#ks.test(df$bmi, "pnorm", mean = mean(df$bmi), sd = sd(df$bmi))
 
-var.test(x,y)
+#var.test(x,y)
 
 
 
-result <- t.test(age ~ stroke, data = dff,
-                 alternative="two.sided",
-                 var.equal=F )
+#result <- t.test(age ~ stroke, data = dff, alternative="two.sided",   var.equal=F )
 
-wilcox.test( bmi~ stroke, data = dff)
+#wilcox.test( bmi~ stroke, data = dff)
 ```
 
 Correlations between Stroke and numeric columns
@@ -306,27 +348,12 @@ df %>% correlate() %>%  focus(stroke)
 
 ```
 
-# Data Preprocessing
 
-## Categorical encoding
-Before modelling we'll have to convert all the categorical columns into integers.
-```{r}
-# printing the uniqu values of the categorical columns
-sapply(cat_cols, function(x){
-                    y=df[[x]]
-                    paste( unique(y))
-        })
-```
-
-Since all the above categories are of Nominal type, no order or ranking, then we are performing **Dummy encoding**.
-```{r}
-library(fastDummies)
-data = dummy_cols(.data= df,
-                  remove_first_dummy = T,   # preventing dummy trap
-                  remove_selected_columns = T)  # removing original columns
-
-```
-
+# Data Pre-processing
+Data Pre-processing steps that will be undertaken are;
+- **Train-test split**: splitting the data into train and test sets, in order to carry out model evaluation on unseen / test data and finally picking the best model. This process will be carried out firts in order to avoid data leakage.
+- **Categorical Encoding**: Encoding all the categorical columns with dummy variables , to prepare data for modelling.
+- **Handling Class Imbalance**: Since our response column `stroke`, has imbalance classes i.e  `r table(df$stroke)`,so as not to create model bais towards the majority class, upsampling of the minority class will be undertaken.
 
 ## train test split
 We split the data into training(80%) and testing (20%) sets, in order to test model performances on unseen data.
@@ -335,94 +362,572 @@ We split the data into training(80%) and testing (20%) sets, in order to test mo
 set.seed(123) 
 
 # train test split
-split_ = initial_split(data=data, prop = 0.8)
+split_ = initial_split(data=df, prop = 0.8, strata= stroke)
 train = training(split_)
 test = testing(split_)
 ```
 
+## Categorical encoding
+Before modelling we'll have to convert all the categorical columns into integers.
+```{r}
+# printing the unique values of the categorical columns
+sapply(cat_cols, function(x){
+                    y=df[[x]]
+                    paste( unique(y))
+        })
+```
+
+Since all the above categories are of Nominal type, no order or ranking, then we are performing **Dummy encoding**.
+
+- **step_dummy()**; in the pre-processing steps will be used to dummy all categorical columns.
+```{r}
+#library(fastDummies)
+#data = dummy_cols(.data= df,
+#                 remove_first_dummy = T,   # preventing dummy trap
+#                 remove_selected_columns = T)  # removing original columns
+
+```
 
 ## handling class imbalance
-Due to the class imbalance in our target variable, `stroke`, we will do a minority oversampling in order to get balanced classes, by generating synthetic data for the minority class using techniques like SMOTE (Synthetic Minority Over-sampling Technique).
+Handling class imbalance in logistic regression is important to ensure that the model does not disproportionately focus on the majority class and neglect the minority class.
+
 ```{r}
 #showing class imbalance fo target variable
 prop.table(table(data$stroke))
 ```
 
 Class 0 of stroke,No stroke, contains 95% of the observations while people who had stoke form 5%.
-```{r}
-#install.packages("remotes")
-#remotes::install_github("cran/DMwR")
-library(DMwR)
 
-data = SMOTE(form=stroke~., 
-             data=train,   # formula and data
-             perc.over = 200,  # percentage of over-sampling
-             perc.under = 100,
-             k = 3)          #number of neighbors to consider
+Due to the class imbalance in our target variable, `stroke`, using the `themis::step_smote()` function to perform minority over-sampling until we achieve equal classes in both categories of our `stroke` response column. 
 
-summary(train)
-dim(data)
-names(data)
-str(data)
-prop.table(table(train$stroke))
-```
+---perform a weighted logistic model, where we assign different weights to the classes during the training phase, with higher weights to the minority class. This way, the model pays more attention to the minority class during training.
 
+Also, in model evaluation, we will choose appropriate evaluation metrics that are not sensitive to class imbalance. For example, use precision, recall, F1-score, or area under the ROC curve (AUC-ROC) instead of accuracy
+
+Building all the above stated pre-processing steps are; 
 ```{r}
 
-install.packages("ROSE")
-library(ROSE)
+library(recipes)
+library(themis)
 
-oversampled_data <- ovun.sample(stroke ~., 
-                                data = train, 
-                                method = "over",
-                                N = 3000,
-                                seed = 123)
 
+recipe_ <- recipe(stroke~., data= train) %>% 
+  step_string2factor(all_string()) %>% # converting string to factor columns
+  step_mutate(stroke= as.factor(stroke)) %>% # converting repsonse variable to factor
+  step_dummy(all_nominal(), -all_outcomes()) %>%  # dummying
+  step_zv(all_predictors()) %>%       # removing variable with zero variance
+  step_normalize(all_predictors()) %>%  # standardizing all predictors
+  step_smote(stroke, 
+             over_ratio = 1,
+             neighbors = 5) %>%      # minority over-sampling
+  prep()
+
+# pre-pocessing the steps on train data
+train_scaled <- juice(recipe_)
+
+# performing the above steps on test data
+test_scaled <- bake(recipe_, new_data = test)
 ```
+
 
 # Modelling
+Because of the binary nature of our response variable, we will create classifier models and later evaluate their performance on the test / unseen data in order to pick the best model.
+
+Also, due to the nature of our main objective, our metric of interest or of importance is `Recall` since we want to be able to identify people who are at risk of stroke as many as possible, hence high levels of recall.
+
+## Logistic Regression
+We will run a weighted logistic regression due to class imbalance and use the models output for inferential purposes, that is;
+1. to identify the import features that highly predict stroke chances
+2. To identify the odds of each variable to the target variable.
+
+
 
 ```{r}
-m = glm(stroke~., data=train, family = binomial)
-predict(m)
+library(parsnip)
+
+# creating the logistic model
+logit_model = logistic_reg() %>% 
+            set_engine("glm") %>% 
+            set_mode("classification") %>% 
+            fit(stroke~., data= train_scaled)
+
+# evaluating model performance on training data
+eval_metrics = metric_set(accuracy, f_meas, recall, precision)
+
+pred_df = logit_model %>% 
+            predict(new_data= train_scaled) %>% 
+            mutate(Actual = train_scaled$stroke) %>% 
+            rename( Predicted = .pred_class)
+
+logit_train_scores = pred_df %>% 
+  eval_metrics(truth= Actual, estimate= Predicted, positive="1") %>% 
+  select(-.estimator)
+
+
+logit_train_scores
 ```
 
 ```{r}
-probs = predict(m,newdata=test,type="response")
-y_pred = ifelse(probs>= 0.5, 1,0)
-table(y_pred)
+# evaluating models performance of test data
+pred_pf = logit_model %>% 
+            predict(new_data = test_scaled) %>% 
+            mutate(Actual = test_scaled$stroke) %>% 
+            rename( Predicted = .pred_class)
 
-metrics2 = function(model, data, boundary=0.5){
-  y= data$stroke
+
+logit_test_scores = pred_pf %>% 
+    eval_metrics(truth= Actual, estimate= Predicted, positive="1") %>% 
+  select(-.estimator)
+
+
+logit_test_scores
+
+```
+
+```{r}
+# confusion matrix
+pred_pf %>% group_by(Actual, Predicted) %>% count() %>% 
+  ggplot(., aes(x=Predicted, y=Actual,fill=n))+
+  geom_tile()+
+  geom_label(aes(label=n, size=3),color="white")+
+  theme(legend.position = "none")
+```
+
+From the confusion matrix, we can identify that...
+
+
+
+
+```{r}
+
+# metrics = function( model, data, threshold=0.5){
+#   probs = predict(model, newdata = data )
+#   y_pred = ifelse( probs>=threshold,1,0)
+#   y = data$stroke
+#   
+#   t = table(y,y_pred)
+#   print(t)
+#   
+#   tn = t[1,1]; tp=t[2,2]; fp= t[1,2]; fn=t[2,1]
+#   
+#   cat("Boundary: ", threshold,"\n")
+#   
+#   cat("Precision: ",round(tp/(tp+fp),3),
+#       "   Recall: ", round(tp/(tp+fn),3),
+#       "\n \n" )
+# }
+# 
+# cat("Training \n")
+# cat(metrics(logit_model, train_scaled, 0.4),"\n")
+# cat("Testing \n")
+# cat(metrics(logit_model, test_scaled,0.4))
+```
+
+
+
+```{r}
+metrics = function( data){
+
+  tn = sum(ifelse(data$Actual=="0" & data$Predicted=="0",1,0))
+  tp = sum(ifelse(data$Actual=="1" & data$Predicted=="1",1,0))
   
-  # making predictions
-  probs = predict(model,newdata=data, type="response")
-  y_pred = ifelse(probs>= boundary, 1,0)
-  # calculating metrics
-  dff= data.frame("truth"= as.factor(y),
-                  "estimate"= as.factor(y_pred))
-  acc= yardstick::accuracy(truth, estimate,data=dff)$.estimate
-  prec= yardstick::precision(truth, estimate,data=dff)$.estimate
-  rec= yardstick::recall(truth, estimate,data=dff)$.estimate
+  fp = sum(ifelse(data$Actual=="0" & data$Predicted=="1",1,0))
+  fn = sum(ifelse(data$Actual=="1" & data$Predicted=="0",1,0))
   
-  cat("Accuracy:", acc,
-      "Precision: ", prec,
-      "Recall: ", rec)
+  print(table(data$Actual, data$Predicted))
+  
+  cat("Precision: ",round(tp/(tp+fp),4),
+      "   Recall: ", round(tp/(tp+fn),4),
+      "\n \n" )
+}
+
+#tt= table("Pred"=predict(l_model, train_scaled)$.pred_class,
+#          "Actual"=train_scaled$stroke)
+
+cat("Training \n")
+cat(metrics(pred_df),"\n")
+cat("Testing \n")
+cat(metrics(pred_pf))
+```
+
+
+
+### Logistic Model Hyperparameter tuning
+```{r}
+
+tune_logit <- function(x,y){
+  model = glm(formula = stroke ~ ., data = train, family = binomial,
+              weights = ifelse(stroke==1,x,y))
+  
+  # validation on test set
+  probs =predict(model, newdata=test, type="response")
+  y_pred=  ifelse( probs>=0.5,1,0)
+  
+  t = table(test$stroke,y_pred)
+  tn = t[1,1]; tp=t[2,2]; fp= t[1,2]; fn=t[2,1]
+  
+  return( list("recall" = round(tp/(tp+fn),4),
+          "precision" = round(tp/(tp+fp),4)))
+}
+
+
+param_grid <- list(seq(1,20,2), seq(0.5,2,0.3))
+
+results = data.frame("params"=character(), 
+                     "recall" = double() ,
+                     "precision"=double() )
+
+for(x in param_grid[[1]]){
+  for(y in param_grid[[2]])  {
+    metrics_ = tune_logit(x,y)
+              
+    r = data.frame( "params"= paste(x,",",y),
+                          "recall" = metrics_$recall,
+                          "precision" = metrics_$precision)
+    results= rbind(results,r)
+              } }
+
+results
+
+```
+
+```{r}
+tune_logit <- function(x, y) {
+  model <- glm(formula = stroke ~ ., data = train, family = binomial, weights = ifelse(stroke == 1, x, y))
+  
+  # Validation on the test set
+  probs <- predict(model, newdata = test, type = "response")
+  y_pred <- ifelse(probs >= 0.5, 1, 0)
+  
+  t <- table(test$stroke, y_pred)
+  tn <- t[1, 1]; tp <- t[2, 2]; fp <- t[1, 2]; fn <- t[2, 1]
+  
+  recall <- round(tp / (tp + fn), 4)
+  precision <- round(tp / (tp + fp), 4)
+  
+  return(list("recall" = recall, "precision" = precision))
+}
+
+param_grid <- list(seq(1, 20, 2), seq(0.5, 0.7,1))
+
+results <- data.frame("params" = character(), 
+                      "recall" = double(),
+                      "precision" = double())
+
+
+for (x in param_grid[[1]]) {
+  for (y in param_grid[[2]]) {
+    metrics_ <- tune_logit(x, y)
+    
+    r <- data.frame("params" = paste0(x, ",", y),
+                    "recall" = metrics_$recall,
+                    "precision" = metrics_$precision)
+    
+    results <- rbind(results, r)
+  }
+}
+
+print(results)
+
+```
+
+```{r}
+
+results %>% ggplot( aes(x=recall, y = precision, label=params))+
+  geom_line()+
+  geom_label(size=2)+
+  scale_x_continuous(breaks = seq(0, 1, 0.05)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.05))
+```
+
+
+
+
+
+
+## K-Nearest Neigbors Model
+```{r}
+library(parsnip)
+library(yardstick)
+
+knn_model = nearest_neighbor() %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification") %>% 
+  fit(stroke~., data= train_scaled)
+
+
+# eval_metrics = metric_set(accuracy, f_meas, recall, precision)
+
+
+pred_df = knn_model %>%
+  predict(new_data=train_scaled) %>% 
+  mutate(Actual= train_scaled$stroke) %>% 
+  rename(Predicted=.pred_class)  
+
+knn_train_scores = pred_df %>% 
+  eval_metrics(.,truth=Actual, estimate= Predicted)%>% 
+  select(-.estimator) 
+  
+knn_train_scores
+
+```
+
+```{r}
+# testing metrics
+pred_pf = knn_model %>%
+  predict(new_data=test_scaled) %>% 
+  mutate(Actual= test_scaled$stroke) %>% 
+  rename(Predicted=.pred_class)  
+
+knn_test_scores = pred_pf %>% 
+  eval_metrics(.,truth=Actual, estimate= Predicted)%>% 
+  select(-.estimator) 
+  
+knn_test_scores
+```
+
+```{r}
+# confusion matrix
+pred_pf %>% group_by(Actual, Predicted) %>% count() %>% 
+  ggplot(., aes(x=Predicted, y=Actual,fill=n))+
+  geom_tile()+
+  geom_label(aes(label=n, size=3),color="white")+
+  theme(legend.position = "none")
+```
+
+
+```{r}
+#validation 2
+
+cat("Training \n")
+cat(metrics(pred_df),"\n")
+cat("Testing \n")
+cat(metrics(pred_pf))
+```
+
+
+
+
+## Decision Tree Model
+### Method 1
+```{r}
+
+# train_ = train
+# train_$stroke = as.factor(train_$stroke)
+
+
+t_model = decision_tree() %>% 
+  set_engine("rpart") %>% 
+  set_mode("classification") %>% 
+  fit(stroke~., data= train_scaled)
+
+pred_df = t_model %>%
+  predict(new_data=train_scaled) %>% 
+  mutate(Actual= train_scaled$stroke) %>% 
+  rename(Predicted=.pred_class)  
+
+tree_train_scores = pred_df %>% 
+  eval_metrics(.,truth=Actual, estimate= Predicted, positive="1")%>% 
+  select(-.estimator) 
+  
+tree_train_scores
+
+```
+
+
+```{r}
+
+# test_ =test
+# test_$stroke = as.factor(test_$stroke)
+
+# testing metrics
+pred_pf = t_model %>%
+  predict(test_scaled) %>% 
+  mutate(Actual= test_scaled$stroke) %>% 
+  rename(Predicted=.pred_class)  #
+
+tree_test_scores = pred_pf %>% 
+  eval_metrics(.,truth = Actual, estimate= Predicted)%>% 
+  select(-.estimator) 
+  
+tree_test_scores
+
+```
+
+```{r}
+# confusion matrix
+pred_pf %>% group_by(Actual, Predicted) %>% count() %>% 
+  ggplot(., aes(x=Predicted, y=Actual,fill=n))+
+  geom_tile()+
+  geom_label(aes(label=n, size=3),color="white")+
+  theme(legend.position = "none")
+```
+
+
+```{r}
+cat("Training \n")
+cat(metrics(pred_df),"\n")
+cat("Testing \n")
+cat(metrics(pred_pf))
+```
+
+
+### Method 2
+```{r}
+library(rpart)
+library(rpart.plot)
+
+# building tree model
+tree_model = rpart(formula = stroke~.,
+                   data=train,
+                   control =  rpart.control(cp=0.01))
+
+# plotting the tree model
+rpart.plot(tree_model, box.palette = "RdBu", digits = -3)
+```
+
+
+**cp:complexity parameter**: is a pruning parameter that penalizing the addition of nodes that do not contribute enough to the overall improvement in the model's performance. ie controls the growth of a tree
+
+```{r}
+# model evaluation
+metric = function( model, df,boundary ){
+  probs = predict(model, df)
+  y_pred= ifelse(probs>= boundary, 1,0)
+  y = df$stroke
+
+  t = table(y,y_pred)
+  print(t)
+  tn = t[1,1]; tp=t[2,2]; fp= t[1,2]; fn=t[2,1]
+  
+  cat("Boundary: ", boundary,"\n")
+  
+  cat("Accuracy: ",round((tp+tn)/(tp+tn+fp+fn),4) ,
+      "  Precision: ",round(tp/(tp+fp),4),
+      "   Recall: ", round(tp/(tp+fn),4),
+      "\n \n" )
 }
 
 cat("Training \n")
-cat(metrics2(m,train),"\n")
+cat(metric(tree_model, train, 0.05),"\n")
 cat("Testing \n")
-cat(metrics2(m, test))
+cat(metric(tree_model, test,0.05))
 
-ta
+```
+
+```{r}
+y_train_pred = ifelse( predict(tree_model, train)>=0.1,1,0) #default type is vector
+y_test_pred = ifelse( predict(tree_model, test)>=0.05,1,0)
+
+eval_metrics = metric_set( accuracy, f_meas, recall, precision)
+
+eval_metrics(data = tibble("stroke"= as.factor(train$stroke),
+                     "prediction"=as.factor(y_train_pred)),
+       truth=stroke, 
+       estimate= prediction)
+```
+
+#### Tree Pruning
+```{r}
+printcp(tree_model)
+plotcp(tree_model)
+
+index = which.min(tree_model$cptable[,"xerror"]) #index of the min cp
+min_cp = tree_model$cptable[index,"CP"] # value of minimum cp value
+# tree creation
+tree_prunned = rpart(formula = stroke~.,
+                  data= train,
+                  control = rpart.control(minsplit = 20,
+                                          maxdepth = 4,
+                                          cp=0))
+# plotting tree
+rpart.plot(tree_prunned, box.palette="RdBu", digits=-3)
+```
+
+```{r}
+cat("Training \n")
+cat(metric(tree_prunned, train, 0.5),"\n")
+cat("Testing \n")
+cat(metric(tree_prunned, test,0.5))
 ```
 
 
-```{r}
-table(test$stroke,y_pred) %>% metrics()
 
-confusionMatrix(table(test$stroke,y_pred)) %>% metrics()
+
+
+
+## Random Forests
+
+```{r}
+# train = train %>% rename(work_type_Self_employed=`work_type_Self-employed`,
+#                          smoking_status_never_smoked=`smoking_status_never smoked`)
+# test =test %>% rename(work_type_Self_employed=`work_type_Self-employed`,
+#                       smoking_status_never_smoked=`smoking_status_never smoked`)
+# 
+# 
+# train$stroke = as.factor(train$stroke)
+# test$stroke = as.factor(test$stroke)
+```
+
+```{r}
+set.seed(123)
+library(randomForest)
+
+# random forest model
+rf_model = randomForest(formula = stroke~.,
+                        data = train_scaled,
+                        ntrees=500)
+
+```
+
+```{r}
+# model evaluation
+# train scores
+y_train_pred = predict(rf_model, train_scaled)
+y_test_pred = predict(rf_model, test_scaled)
+
+eval_metrics(data=tibble("Actual"=train_scaled$stroke,
+                            "Predicted"= y_train_pred), 
+             truth=Actual,
+             estimate= Predicted )
+```
+
+```{r}
+# test scores
+eval_metrics(data=tibble("Actual"=test_scaled$stroke,
+                            "Predicted"= y_test_pred), 
+             truth=Actual,
+             estimate= Predicted )
+```
+
+
+
+
+```{r}
+metric_ = function( model, data){
+  y_pred = predict(model, newdata = data )
+ 
+  y = data$stroke
+  
+  t = table(y,y_pred)
+  print(t)
+  
+  tn = t[1,1]; tp=t[2,2]; fp= t[1,2]; fn=t[2,1]
+
+  
+  cat("Precision: ",round(tp/(tp+fp),3),
+      "   Recall: ", round(tp/(tp+fn),3),
+      "\n \n" )
+}
+
+
+
+
+cat("Training \n")
+cat(metric_(rf_model, train_scaled),"\n")
+cat("Testing \n")
+cat(metric_(rf_model, test_scaled))
+
 ```
 
 # Conclusion
